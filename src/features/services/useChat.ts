@@ -1,7 +1,7 @@
 'use no memo'
 import { useEffect, useState } from 'react'
 import { supabase } from '~/features/supabase/client'
-import type { ChatMessage, Conversation } from '~/features/supabase/types'
+import type { ChatMessage } from '~/features/supabase/types'
 
 export function useConversations(userId: string | undefined) {
   const [conversations, setConversations] = useState<any[]>([])
@@ -36,7 +36,7 @@ export function useConversations(userId: string | undefined) {
   }, [userId])
 
   const startConversation = async (otherUserId: string, listingId?: string, listingType?: 'request' | 'offer') => {
-    if (!userId) return { error: new Error('Not authenticated') }
+    if (!userId) return { data: null, error: new Error('Not authenticated') }
 
     const [user1Id, user2Id] = [userId, otherUserId].sort()
 
@@ -85,7 +85,12 @@ export function useChatMessages(conversationId: string | undefined) {
         table: 'chat_messages',
         filter: `conversation_id=eq.${conversationId}`,
       }, (payload) => {
-        setMessages(prev => [...prev, payload.new as ChatMessage])
+        setMessages(prev => {
+          const incoming = payload.new as ChatMessage
+          // avoid duplicates from optimistic update
+          if (prev.some(m => m.id === incoming.id)) return prev
+          return [...prev, incoming]
+        })
       })
       .subscribe()
 
@@ -93,13 +98,42 @@ export function useChatMessages(conversationId: string | undefined) {
   }, [conversationId])
 
   const sendMessage = async (senderId: string, content: string) => {
-    if (!conversationId) return
+    if (!conversationId) return { error: new Error('No conversation') }
 
-    await supabase.from('chat_messages').insert({
+    // Optimistic update so the message appears immediately
+    const tempId = `temp-${Date.now()}`
+    const optimistic: ChatMessage = {
+      id: tempId,
       conversation_id: conversationId,
       sender_id: senderId,
       content,
-    })
+      read_at: null,
+      created_at: new Date().toISOString(),
+    }
+    setMessages(prev => [...prev, optimistic])
+
+    const { data, error } = await supabase
+      .from('chat_messages')
+      .insert({ conversation_id: conversationId, sender_id: senderId, content })
+      .select()
+      .single()
+
+    if (error) {
+      // roll back optimistic update
+      setMessages(prev => prev.filter(m => m.id !== tempId))
+      return { error }
+    }
+
+    // replace temp entry with the persisted record
+    setMessages(prev => prev.map(m => (m.id === tempId ? data : m)))
+
+    // keep conversation list ordered by latest activity
+    await supabase
+      .from('conversations')
+      .update({ updated_at: new Date().toISOString() })
+      .eq('id', conversationId)
+
+    return { data, error: null }
   }
 
   const markAsRead = async (messageId: string) => {
@@ -109,5 +143,72 @@ export function useChatMessages(conversationId: string | undefined) {
       .eq('id', messageId)
   }
 
-  return { messages, isLoading, sendMessage, markAsRead }
+  const markAllAsRead = async (userId: string) => {
+    if (!conversationId) return
+    await supabase
+      .from('chat_messages')
+      .update({ read_at: new Date().toISOString() })
+      .eq('conversation_id', conversationId)
+      .neq('sender_id', userId)
+      .is('read_at', null)
+    setMessages(prev =>
+      prev.map(m =>
+        m.sender_id !== userId && !m.read_at
+          ? { ...m, read_at: new Date().toISOString() }
+          : m
+      )
+    )
+  }
+
+  return { messages, isLoading, sendMessage, markAsRead, markAllAsRead }
+}
+
+/**
+ * Returns the unread message count (messages from the other party that the
+ * current user has not yet read) for the conversation linked to a specific
+ * listing.  Also returns the conversationId so callers can navigate to it.
+ */
+export function useListingUnreadCount(
+  userId: string | undefined,
+  listingId: string | undefined,
+  listingType: 'request' | 'offer' | undefined
+) {
+  const [unreadCount, setUnreadCount] = useState(0)
+  const [conversationId, setConversationId] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!userId || !listingId || !listingType) return
+
+    let cancelled = false
+
+    const fetchUnread = async () => {
+      const { data: conv, error: convError } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('listing_id', listingId)
+        .or(`user1_id.eq.${userId},user2_id.eq.${userId}`)
+        .maybeSingle()
+
+      if (cancelled || convError || !conv) return
+
+      setConversationId(conv.id)
+
+      const { count, error: countError } = await supabase
+        .from('chat_messages')
+        .select('id', { count: 'exact', head: true })
+        .eq('conversation_id', conv.id)
+        .neq('sender_id', userId)
+        .is('read_at', null)
+
+      if (!cancelled && !countError) {
+        setUnreadCount(count || 0)
+      }
+    }
+
+    fetchUnread()
+
+    return () => { cancelled = true }
+  }, [userId, listingId, listingType])
+
+  return { unreadCount, conversationId }
 }

@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { supabase } from '~/features/supabase/client'
 import { useSupabaseAuth } from '~/features/supabase/useSupabaseAuth'
 import { useFavorites } from '~/features/services/useFavorites'
-import { useConversations } from '~/features/services/useChat'
+import { useConversations, useListingUnreadCount } from '~/features/services/useChat'
 import { Button } from '~/interface/buttons/Button'
 import { showToast } from '~/interface/toast/helpers'
 import type { ServiceRequest, ServiceOffer } from '~/features/supabase/types'
@@ -21,6 +21,7 @@ export default function ListingDetailPage() {
   const [isEditing, setIsEditing] = useState(false)
   const { isFavorite, addFavorite, removeFavorite } = useFavorites(user?.id)
   const { startConversation } = useConversations(user?.id)
+  const { unreadCount, conversationId: existingConvId } = useListingUnreadCount(user?.id, listingId, listingType)
   const insets = useSafeAreaInsets()
 
   useEffect(() => {
@@ -48,6 +49,11 @@ export default function ListingDetailPage() {
     const ownerId = listing.user_id
     if (ownerId === user.id) {
       showToast('Це ваш власний запис', { type: 'info' })
+      return
+    }
+
+    if (existingConvId) {
+      router.push(`/home/chat/${existingConvId}`)
       return
     }
 
@@ -197,7 +203,7 @@ export default function ListingDetailPage() {
                 variant="floating"
                 onPress={handleStartChat}
               >
-                💬 Написати повідомлення
+                💬 Написати повідомлення{unreadCount > 0 ? ` (${unreadCount})` : ''}
               </Button>
               <XStack gap="$2">
                 <Button

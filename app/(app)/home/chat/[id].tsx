@@ -13,7 +13,7 @@ export default function ChatPage() {
   const params = useParams()
   const conversationId = params?.id as string
   const { user } = useSupabaseAuth()
-  const { messages, isLoading, sendMessage } = useChatMessages(conversationId)
+  const { messages, isLoading, sendMessage, markAllAsRead } = useChatMessages(conversationId)
   const [newMessage, setNewMessage] = useState('')
   const scrollRef = useRef<any>(null)
   const insets = useSafeAreaInsets()
@@ -23,6 +23,15 @@ export default function ChatPage() {
       scrollRef.current.scrollToEnd?.({ animated: true })
     }
   }, [messages])
+
+  // mark incoming messages as read when the conversation is open
+  useEffect(() => {
+    if (!user || messages.length === 0) return
+    const hasUnread = messages.some(m => m.sender_id !== user.id && !m.read_at)
+    if (hasUnread) {
+      markAllAsRead(user.id)
+    }
+  }, [messages.length])
 
   const handleSend = async () => {
     if (!newMessage.trim() || !user) return
