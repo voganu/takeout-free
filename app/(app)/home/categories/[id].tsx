@@ -9,6 +9,7 @@ import { useSubscriptions } from '~/features/services/useSubscriptions'
 import { useSupabaseAuth } from '~/features/supabase/useSupabaseAuth'
 import { supabase } from '~/features/supabase/client'
 import { Button } from '~/interface/buttons/Button'
+import { Input } from '~/interface/forms/Input'
 import { showToast } from '~/interface/toast/helpers'
 import type { Category } from '~/features/supabase/types'
 
@@ -23,6 +24,10 @@ export const CategoryPage = memo(() => {
   const { subscribe, unsubscribe, isSubscribed } = useSubscriptions(user?.id)
   const insets = useSafeAreaInsets()
 
+  // pending subscription notes state
+  const [showNotesInput, setShowNotesInput] = useState(false)
+  const [pendingNotes, setPendingNotes] = useState('')
+
   useEffect(() => {
     if (categoryId) {
       supabase
@@ -34,18 +39,25 @@ export const CategoryPage = memo(() => {
     }
   }, [categoryId])
 
-  const handleSubscribe = async () => {
+  const handleSubscribePress = () => {
     if (!user) {
       router.push('/auth/login')
       return
     }
     if (isSubscribed(categoryId)) {
-      await unsubscribe(categoryId)
+      unsubscribe(categoryId)
       showToast('Відписано від категорії', { type: 'info' })
     } else {
-      await subscribe(categoryId, 'both')
-      showToast('Підписано на категорію', { type: 'success' })
+      setShowNotesInput(true)
+      setPendingNotes('')
     }
+  }
+
+  const handleConfirmSubscribe = async () => {
+    await subscribe(categoryId, 'both', pendingNotes.trim() || undefined)
+    showToast('Підписано на категорію', { type: 'success' })
+    setShowNotesInput(false)
+    setPendingNotes('')
   }
 
   const isLoading = reqLoading || offLoading
@@ -67,11 +79,46 @@ export const CategoryPage = memo(() => {
           size="$3"
           theme={isSubscribed(categoryId) ? 'green' : undefined}
           variant={isSubscribed(categoryId) ? 'floating' : 'outlined'}
-          onPress={handleSubscribe}
+          onPress={handleSubscribePress}
         >
           {isSubscribed(categoryId) ? '✓ Підписано' : '+ Підписатись'}
         </Button>
       </XStack>
+
+      {/* Inline notes input when subscribing */}
+      {showNotesInput && (
+        <YStack
+          px="$4"
+          py="$3"
+          gap="$2"
+          bg="$blue2"
+          borderBottomWidth={1}
+          borderBottomColor="$blue5"
+        >
+          <SizableText size="$3" fontWeight="600" color="$blue10">
+            Уточнення для підписки (необов'язково)
+          </SizableText>
+          <Input
+            placeholder="Наприклад: тільки у Києві, бюджет до 5000 грн..."
+            value={pendingNotes}
+            onChangeText={setPendingNotes}
+            size="$3"
+            multiline
+          />
+          <XStack gap="$2" justify="flex-end">
+            <Button
+              size="$3"
+              variant="outlined"
+              onPress={() => { setShowNotesInput(false); setPendingNotes('') }}
+            >
+              Скасувати
+            </Button>
+            <Button size="$3" theme="dark_blue" variant="floating" onPress={handleConfirmSubscribe}>
+              Підписатись
+            </Button>
+          </XStack>
+        </YStack>
+      )}
 
       {/* Tabs */}
       <XStack px="$4" py="$2" gap="$2" borderBottomWidth={1} borderBottomColor="$borderColor">

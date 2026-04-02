@@ -6,8 +6,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useSearch } from '~/features/services/useSearch'
 import { useCategories } from '~/features/services/useCategories'
 import { useSupabaseAuth } from '~/features/supabase/useSupabaseAuth'
+import { useConversations } from '~/features/services/useChat'
 import { Button } from '~/interface/buttons/Button'
 import { Input } from '~/interface/forms/Input'
+import { showToast } from '~/interface/toast/helpers'
 
 type FilterType = 'all' | 'requests' | 'offers'
 
@@ -20,6 +22,7 @@ export const SearchPage = memo(() => {
   const { requests, offers, isLoading, search } = useSearch()
   const { categories } = useCategories()
   const { user } = useSupabaseAuth()
+  const { startConversation } = useConversations(user?.id)
   const insets = useSafeAreaInsets()
 
   useEffect(() => {
@@ -34,6 +37,23 @@ export const SearchPage = memo(() => {
     if (filter === 'requests') listingType = 'request'
     else if (filter === 'offers') listingType = 'offer'
     search(searchQuery, selectedCategory, listingType)
+  }
+
+  const handleStartChat = async (ownerId: string, listingId: string, listingType: 'request' | 'offer') => {
+    if (!user) {
+      router.push('/auth/login')
+      return
+    }
+    if (ownerId === user.id) {
+      showToast('Це ваш власний запис', { type: 'info' })
+      return
+    }
+    const { data, error } = await startConversation(ownerId, listingId, listingType)
+    if (error || !data) {
+      showToast('Помилка створення чату', { type: 'error' })
+      return
+    }
+    router.push(`/home/chat/${data.id}`)
   }
 
   const filters: { key: FilterType; label: string }[] = [
@@ -177,7 +197,14 @@ export const SearchPage = memo(() => {
                           <SizableText size="$3" cursor="pointer" color="$color8">👍</SizableText>
                           <SizableText size="$3" cursor="pointer" color="$color8">👎</SizableText>
                           <SizableText size="$3" cursor="pointer" color="$color8">⭐</SizableText>
-                          <SizableText size="$3" cursor="pointer" color="$blue10">💬 Написати</SizableText>
+                          <SizableText
+                            size="$3"
+                            cursor="pointer"
+                            color="$blue10"
+                            onPress={() => handleStartChat(req.user_id, req.id, 'request')}
+                          >
+                            💬 Написати
+                          </SizableText>
                         </XStack>
                       )}
                     </YStack>
@@ -226,7 +253,14 @@ export const SearchPage = memo(() => {
                           <SizableText size="$3" cursor="pointer" color="$color8">👍</SizableText>
                           <SizableText size="$3" cursor="pointer" color="$color8">👎</SizableText>
                           <SizableText size="$3" cursor="pointer" color="$color8">⭐</SizableText>
-                          <SizableText size="$3" cursor="pointer" color="$blue10">💬 Написати</SizableText>
+                          <SizableText
+                            size="$3"
+                            cursor="pointer"
+                            color="$blue10"
+                            onPress={() => handleStartChat(offer.user_id, offer.id, 'offer')}
+                          >
+                            💬 Написати
+                          </SizableText>
                         </XStack>
                       )}
                     </YStack>
