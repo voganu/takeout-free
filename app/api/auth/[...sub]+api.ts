@@ -1,6 +1,9 @@
-import { authAPIHandler } from '~/features/auth/server/apiHandler'
-
 import type { Endpoint } from 'one'
 
-export const GET: Endpoint = authAPIHandler('GET')
-export const POST: Endpoint = authAPIHandler('POST')
+export const GET: Endpoint = async () => {
+  return Response.json({ status: 'ok' })
+}
+
+export const POST: Endpoint = async () => {
+  return Response.json({ status: 'ok' })
+}
