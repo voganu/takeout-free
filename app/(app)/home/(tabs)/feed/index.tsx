@@ -1,30 +1,44 @@
+import { router } from 'one'
 import { memo, useState } from 'react'
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
-import { isWeb, ScrollView, SizableText, Spinner, Theme, XStack, YStack } from 'tamagui'
+import { isWeb, ScrollView, SizableText, Spinner, XStack, YStack, Input as TamaguiInput } from 'tamagui'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import { useTodos } from '~/features/todo/useTodos'
+import { useSupabaseAuth } from '~/features/supabase/useSupabaseAuth'
+import { useCategories } from '~/features/services/useCategories'
+import { useSubscriptions } from '~/features/services/useSubscriptions'
+import { useCategorize } from '~/features/services/useCategorize'
 import { Button } from '~/interface/buttons/Button'
-import { Input } from '~/interface/forms/Input'
-import { PageContainer } from '~/interface/layout/PageContainer'
-import { H1, H3 } from '~/interface/text/Headings'
+import { showToast } from '~/interface/toast/helpers'
 
 export const HomePage = memo(() => {
-  const { todos, isLoading, addTodo, toggleTodo, deleteTodo } = useTodos()
-  const [newTodoText, setNewTodoText] = useState('')
+  const { user } = useSupabaseAuth()
+  const { categories: requestCategories } = useCategories('request')
+  const { categories: offerCategories } = useCategories('offer')
+  const { subscriptions } = useSubscriptions(user?.id)
+  const { categorize, isLoading: isCategorizing } = useCategorize()
+  const [searchText, setSearchText] = useState('')
   const insets = useSafeAreaInsets()
 
-  const handleAddTodo = () => {
-    if (!newTodoText.trim()) return
-    addTodo(newTodoText.trim())
-    setNewTodoText('')
+  const handleSearch = async () => {
+    if (!searchText.trim()) return
+    if (!user) {
+      router.push('/search?q=' + encodeURIComponent(searchText))
+      return
+    }
+    // Use categorize edge function to create listing and redirect
+    const { data, error } = await categorize(searchText, user.id)
+    if (error) {
+      showToast('Помилка обробки запиту', { type: 'error' })
+      return
+    }
+    showToast(data.message, { type: 'success' })
+    router.push('/search?q=' + encodeURIComponent(searchText))
   }
 
   const content = (
     <YStack
-      position="relative"
-      flexBasis="auto"
-      bg="$background"
       flex={1}
+      bg="$background"
       {...(isWeb && {
         width: '100vw' as any,
         ml: '50%' as any,
@@ -32,140 +46,177 @@ export const HomePage = memo(() => {
         minHeight: '100vh' as any,
       })}
     >
-      {/* notice banner */}
-      <Theme name="yellow">
-        <XStack bg="$color3" py="$3" width="100%">
-          <PageContainer>
-            <SizableText size="$4">
-              This free stack was just extracted and needs syncing with the latest. We'll
-              be back soon!
-            </SizableText>
-          </PageContainer>
-        </XStack>
-      </Theme>
-
+      {/* Center hero section */}
       <YStack
-        pb={isWeb ? '$10' : insets.bottom + 40}
-        gap="$6"
-        px="$4"
-        width="100%"
-        maxW={1200}
-        mx="auto"
         flex={1}
+        items="center"
+        justify="center"
+        gap="$6"
+        pt="$10"
+        pb="$8"
+        px="$4"
       >
-        {/* todo list */}
-        <YStack flex={1} gap="$4" pt="$4">
-          <H1 py="$2" size="$6">
-            Todo Demo
-          </H1>
+        {/* Logo */}
+        <SizableText
+          fontSize={56}
+          fontWeight="bold"
+          color="$color12"
+          letterSpacing={-2}
+        >
+          Agent
+        </SizableText>
 
-          <XStack gap="$2" width="100%">
-            <Input
+        {/* Search pill */}
+        <YStack width="100%" maxW={600} gap="$3">
+          <XStack
+            bg="$color2"
+            borderWidth={1}
+            borderColor="$borderColor"
+            rounded={100}
+            px="$4"
+            py="$2"
+            items="center"
+            gap="$2"
+            hoverStyle={{ borderColor: '$color8' }}
+            focusStyle={{ borderColor: '$blue10' }}
+          >
+            <SizableText size="$5">🔍</SizableText>
+            <TamaguiInput
               flex={1}
-              placeholder="What needs to be done?"
-              value={newTodoText}
-              onChangeText={setNewTodoText}
-              onSubmitEditing={handleAddTodo}
-              size="$6"
-              height={56}
+              placeholder="Напишіть ваш запит або пропозицію..."
+              value={searchText}
+              onChangeText={setSearchText}
+              bg="transparent"
+              borderWidth={0}
+              size="$5"
+              onSubmitEditing={handleSearch}
+              placeholderTextColor="$color8"
             />
-            <Button onPress={handleAddTodo} theme="blue" px="$5">
-              Add
-            </Button>
+            {searchText.length > 0 && (
+              <SizableText
+                size="$5"
+                cursor="pointer"
+                onPress={() => setSearchText('')}
+              >
+                ✕
+              </SizableText>
+            )}
+            <SizableText size="$5" cursor="pointer" onPress={handleSearch}>
+              🎤
+            </SizableText>
           </XStack>
 
-          {isLoading ? (
-            <YStack p="$4" items="center" justify="center">
-              <Spinner size="small" />
-            </YStack>
-          ) : todos.length === 0 ? (
-            <YStack p="$4" items="center" justify="center" mt="$4">
-              <H3>No todos yet - add one above!</H3>
-            </YStack>
-          ) : (
-            <YStack gap="$2">
-              {todos.map((todo) => (
-                <XStack
-                  key={todo.id}
-                  p="$3"
-                  bg="$color2"
-                  rounded="$4"
-                  items="center"
-                  gap="$3"
-                  pressStyle={{ opacity: 0.8 }}
-                >
-                  <XStack
-                    width={20}
-                    height={20}
-                    rounded="$2"
-                    borderWidth={2}
-                    borderColor={todo.completed ? '$green9' : '$color8'}
-                    bg={todo.completed ? '$green9' : 'transparent'}
-                    items="center"
-                    justify="center"
-                    cursor="pointer"
-                    onPress={() => toggleTodo(todo.id, !todo.completed)}
-                  >
-                    {todo.completed && (
-                      <SizableText size="$1" color="white" fontWeight="bold">
-                        ✓
-                      </SizableText>
-                    )}
-                  </XStack>
-                  <SizableText
-                    flex={1}
-                    textDecorationLine={todo.completed ? 'line-through' : 'none'}
-                    opacity={todo.completed ? 0.6 : 1}
-                  >
-                    {todo.text}
-                  </SizableText>
-                  <Button theme="red" px="$3" onPress={() => deleteTodo(todo.id)}>
-                    ✕
-                  </Button>
-                </XStack>
-              ))}
-            </YStack>
-          )}
+          <XStack justify="center" gap="$2" flexWrap="wrap">
+            <Button
+              size="$3"
+              rounded="$4"
+              onPress={handleSearch}
+              disabled={isCategorizing}
+              theme="dark_blue"
+            >
+              {isCategorizing ? <Spinner size="small" /> : 'Пошук'}
+            </Button>
+            <Button
+              size="$3"
+              rounded="$4"
+              onPress={() => router.push('/home/categories')}
+            >
+              Категорії
+            </Button>
+          </XStack>
         </YStack>
 
-        {/* about section */}
-        <YStack
-          display="none"
-          pt="$4"
-          gap="$4"
-          $lg={{ display: 'flex', width: 340, pt: '$12' }}
-        >
-          <Theme name="blue">
-            <YStack
-              p="$4"
-              bg="$color3"
-              rounded="$4"
-              borderColor="$color6"
-              borderWidth={1}
-            >
-              <H3 mb="$2" color="$color11">
-                Takeout Free
-              </H3>
-              <YStack gap="$2" opacity={0.8}>
-                <SizableText size="$6">
-                  A minimal but complete stack for native and web apps.
-                </SizableText>
-                <YStack gap="$1" mt="$1">
-                  <SizableText size="$4" color="$color11">
-                    One • Tamagui • Zero • Better Auth
-                  </SizableText>
-                  <SizableText size="$4" color="$color11">
-                    Bun • TypeScript
+        {/* Language selector */}
+        <SizableText size="$3" color="$color10">
+          🇺🇦 Українська
+        </SizableText>
+      </YStack>
+
+      {/* Subscriptions section */}
+      {subscriptions.length > 0 && (
+        <YStack px="$4" py="$4" gap="$3" maxW={800} mx="auto" width="100%">
+          <SizableText size="$5" fontWeight="bold" color="$color12">
+            Мої підписки
+          </SizableText>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <XStack gap="$2" pb="$2">
+              {subscriptions.map((sub: any) => (
+                <YStack
+                  key={sub.id}
+                  bg="$color3"
+                  rounded="$4"
+                  px="$3"
+                  py="$2"
+                  cursor="pointer"
+                  pressStyle={{ opacity: 0.7 }}
+                  onPress={() => router.push(`/home/categories/${sub.category_id}`)}
+                >
+                  <SizableText size="$3">
+                    {sub.categories?.icon} {sub.categories?.name}
                   </SizableText>
                 </YStack>
-                <SizableText size="$4" mt="$2" opacity={0.7}>
-                  Includes scripts for dev, build, deploy, and a clean package structure
-                  ready for production.
-                </SizableText>
-              </YStack>
-            </YStack>
-          </Theme>
+              ))}
+            </XStack>
+          </ScrollView>
         </YStack>
+      )}
+
+      {/* Categories section */}
+      <YStack px="$4" py="$4" gap="$4" maxW={800} mx="auto" width="100%">
+        <SizableText size="$5" fontWeight="bold" color="$color12">
+          Популярні категорії
+        </SizableText>
+        <YStack gap="$3">
+          {requestCategories.slice(0, 4).map((cat) => (
+            <XStack
+              key={cat.id}
+              bg="$color2"
+              rounded="$4"
+              p="$3"
+              items="center"
+              gap="$3"
+              cursor="pointer"
+              pressStyle={{ opacity: 0.7 }}
+              borderWidth={1}
+              borderColor="$borderColor"
+              onPress={() => router.push(`/home/categories/${cat.id}`)}
+            >
+              <SizableText size="$6">{cat.icon}</SizableText>
+              <YStack flex={1}>
+                <SizableText size="$4" fontWeight="600">{cat.name}</SizableText>
+                <SizableText size="$3" color="$color10">{cat.description}</SizableText>
+              </YStack>
+              <SizableText size="$5" color="$color8">›</SizableText>
+            </XStack>
+          ))}
+        </YStack>
+
+        <Button
+          size="$4"
+          variant="outlined"
+          onPress={() => router.push('/home/categories')}
+        >
+          Переглянути всі категорії
+        </Button>
+      </YStack>
+
+      {/* Footer */}
+      <YStack
+        py="$4"
+        px="$4"
+        items="center"
+        gap="$2"
+        borderTopWidth={1}
+        borderTopColor="$borderColor"
+        mt="$4"
+      >
+        <SizableText size="$3" color="$color8">Україна</SizableText>
+        <XStack gap="$4" flexWrap="wrap" justify="center">
+          <SizableText size="$2" color="$color8" cursor="pointer">Темна тема</SizableText>
+          <SizableText size="$2" color="$color8" cursor="pointer" onPress={() => router.push('/home/settings')}>Настройки</SizableText>
+          <SizableText size="$2" color="$color8" cursor="pointer">Конфіденційність</SizableText>
+          <SizableText size="$2" color="$color8" cursor="pointer">Умови</SizableText>
+        </XStack>
       </YStack>
     </YStack>
   )

@@ -1,23 +1,56 @@
 import { router } from 'one'
 import { useState } from 'react'
-import { Circle, isWeb, Spinner, XStack, YStack } from 'tamagui'
+import { isWeb, Spinner, XStack, YStack, SizableText } from 'tamagui'
 
 import { APP_NAME } from '~/constants/app'
-import { signInAsDemo } from '~/features/auth/client/signInAsDemo'
-import { isDemoMode } from '~/helpers/isDemoMode'
-import { Link } from '~/interface/app/Link'
-import { LogoIcon } from '~/interface/app/LogoIcon'
+import { signInWithEmail, signInWithGoogle, signInWithMagicLink } from '~/features/supabase/useSupabaseAuth'
 import { Button } from '~/interface/buttons/Button'
-import { AppleIcon } from '~/interface/icons/AppleIcon'
+import { Input } from '~/interface/forms/Input'
 import { GoogleIcon } from '~/interface/icons/GoogleIcon'
 import { H2 } from '~/interface/text/Headings'
 import { showToast } from '~/interface/toast/helpers'
 
 export const LoginPage = () => {
-  const [demoLoading, setDemoLoading] = useState<boolean>(false)
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
+  const [mode, setMode] = useState<'login' | 'magic'>('login')
 
-  const handleSocialLogin = async (provider: 'google' | 'apple') => {
-    showToast(`${provider} login coming soon!`, { type: 'info' })
+  const handleEmailLogin = async () => {
+    if (!email || !password) {
+      showToast('Введіть email та пароль', { type: 'error' })
+      return
+    }
+    setIsLoading(true)
+    const { error } = await signInWithEmail(email, password)
+    setIsLoading(false)
+    if (error) {
+      showToast(error.message, { type: 'error' })
+    } else {
+      router.replace('/home/feed')
+    }
+  }
+
+  const handleMagicLink = async () => {
+    if (!email) {
+      showToast('Введіть email', { type: 'error' })
+      return
+    }
+    setIsLoading(true)
+    const { error } = await signInWithMagicLink(email)
+    setIsLoading(false)
+    if (error) {
+      showToast(error.message, { type: 'error' })
+    } else {
+      showToast('Перевірте email — ми надіслали посилання для входу', { type: 'success' })
+    }
+  }
+
+  const handleGoogleLogin = async () => {
+    const { error } = await signInWithGoogle()
+    if (error) {
+      showToast(error.message, { type: 'error' })
+    }
   }
 
   return (
@@ -26,122 +59,114 @@ export const LoginPage = () => {
       justify="center"
       items="center"
       $platform-web={{ minHeight: '100vh' }}
+      bg="$background"
     >
-      <Circle
-        size={80}
-        my="$4"
-        transition="medium"
-        enterStyle={{ scale: 0.95, opacity: 0 }}
-      >
-        <LogoIcon size={42} />
-      </Circle>
-
       <YStack
-        gap="$6"
+        gap="$4"
         width="100%"
         items="center"
         bg="$background"
         rounded="$8"
         p={isWeb ? '$6' : '$4'}
         maxW={isWeb ? 400 : '90%'}
+        borderWidth={isWeb ? 1 : 0}
+        borderColor="$borderColor"
       >
-        <H2 text="center">Login to {APP_NAME}</H2>
+        <H2 text="center">Вхід до {APP_NAME}</H2>
 
-        <YStack
-          key="welcome-content"
-          gap="$4"
-          items="center"
+        <Input
+          placeholder="Email"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
           width="100%"
-          transition="medium"
-          enterStyle={{ opacity: 0, y: 10 }}
-          exitStyle={{ opacity: 0, y: -10 }}
-          position="relative"
-          overflow="hidden"
-        >
-          <YStack width="100%" gap="$3">
-            <Link
-              href="/auth/signup/email"
-              $platform-web={{
-                display: 'contents',
-              }}
-              asChild
+          size="$5"
+        />
+
+        {mode === 'login' && (
+          <Input
+            placeholder="Пароль"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            width="100%"
+            size="$5"
+          />
+        )}
+
+        {mode === 'login' ? (
+          <>
+            <Button
+              size="$5"
+              theme="dark_blue"
+              variant="floating"
+              width="100%"
+              onPress={handleEmailLogin}
+              disabled={isLoading}
             >
-              <Button
-                size="$5"
-                theme="dark_blue"
-                variant="floating"
-                pressStyle={{
-                  scale: 0.97,
-                  opacity: 0.9,
-                }}
-                transition="200ms"
-                enterStyle={{ opacity: 0, scale: 0.95 }}
-              >
-                Continue with Email
-              </Button>
-            </Link>
+              {isLoading ? <Spinner size="small" /> : 'Увійти'}
+            </Button>
 
-            {/* DEMO mode - enabled in dev or when VITE_DEMO_MODE=1 */}
-            {isDemoMode && (
-              <Button
-                variant="outlined"
-                size="$5"
-                onPress={async () => {
-                  setDemoLoading(true)
-                  const { error } = await signInAsDemo()
-                  setDemoLoading(false)
-                  if (error) {
-                    showToast('Demo login failed', { type: 'error' })
-                    return
-                  }
-                  router.replace('/home/feed')
-                }}
-                disabled={demoLoading}
-                width="100%"
-                data-testid="login-as-demo"
-                pressStyle={{
-                  scale: 0.97,
-                }}
-                transition="200ms"
-                enterStyle={{ opacity: 0, scale: 0.95 }}
-              >
-                {demoLoading ? <Spinner size="small" /> : 'Login as Demo User'}
-              </Button>
-            )}
-          </YStack>
-
-          <XStack width="100%" gap="$3" justify="center" overflow="visible">
+            <SizableText
+              size="$3"
+              color="$color10"
+              cursor="pointer"
+              onPress={() => setMode('magic')}
+            >
+              Увійти через Magic Link
+            </SizableText>
+          </>
+        ) : (
+          <>
             <Button
               size="$5"
-              onPress={() => handleSocialLogin('google')}
-              pressStyle={{
-                scale: 0.97,
-                bg: '$color2',
-              }}
-              hoverStyle={{
-                bg: '$color2',
-              }}
-              transition="200ms"
-              enterStyle={{ opacity: 0, scale: 0.95 }}
-              icon={<GoogleIcon size={18} />}
-            />
+              theme="dark_blue"
+              variant="floating"
+              width="100%"
+              onPress={handleMagicLink}
+              disabled={isLoading}
+            >
+              {isLoading ? <Spinner size="small" /> : 'Надіслати Magic Link'}
+            </Button>
 
-            <Button
-              size="$5"
-              onPress={() => handleSocialLogin('apple')}
-              pressStyle={{
-                scale: 0.97,
-                bg: '$color2',
-              }}
-              hoverStyle={{
-                bg: '$color2',
-              }}
-              transition="200ms"
-              enterStyle={{ opacity: 0, scale: 0.95 }}
-              icon={<AppleIcon size={20} />}
-            />
-          </XStack>
-        </YStack>
+            <SizableText
+              size="$3"
+              color="$color10"
+              cursor="pointer"
+              onPress={() => setMode('login')}
+            >
+              Увійти з паролем
+            </SizableText>
+          </>
+        )}
+
+        <XStack width="100%" items="center" gap="$3">
+          <YStack flex={1} height={1} bg="$borderColor" />
+          <SizableText size="$3" color="$color8">або</SizableText>
+          <YStack flex={1} height={1} bg="$borderColor" />
+        </XStack>
+
+        <Button
+          size="$5"
+          width="100%"
+          onPress={handleGoogleLogin}
+          icon={<GoogleIcon size={18} />}
+        >
+          Продовжити з Google
+        </Button>
+
+        <XStack gap="$2">
+          <SizableText size="$3" color="$color10">Немає акаунту?</SizableText>
+          <SizableText
+            size="$3"
+            color="$blue10"
+            cursor="pointer"
+            onPress={() => router.push('/auth/signup/email')}
+          >
+            Зареєструватись
+          </SizableText>
+        </XStack>
       </YStack>
     </YStack>
   )
