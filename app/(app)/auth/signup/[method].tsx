@@ -1,118 +1,111 @@
-import { useParams, useRouter, createRoute } from 'one'
-import { memo, useLayoutEffect, useRef, useState } from 'react'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { SizableText, Spinner, useEvent, XStack, YStack } from 'tamagui'
+import { router, useParams } from 'one'
+import { useState } from 'react'
+import { isWeb, Spinner, YStack, SizableText, XStack } from 'tamagui'
 
+import { APP_NAME } from '~/constants/app'
+import { signUpWithEmail } from '~/features/supabase/useSupabaseAuth'
 import { Button } from '~/interface/buttons/Button'
-import { Pressable } from '~/interface/buttons/Pressable'
-import { showError } from '~/interface/dialogs/actions'
 import { Input } from '~/interface/forms/Input'
-import { CaretLeftIcon } from '~/interface/icons/phosphor/CaretLeftIcon'
-import { PageLayout } from '~/interface/pages/PageLayout'
+import { H2 } from '~/interface/text/Headings'
+import { showToast } from '~/interface/toast/helpers'
 
-const route = createRoute<'/(app)/auth/signup/[method]'>()
+export const SignupPage = () => {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [fullName, setFullName] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
 
-export const SignupPage = memo(() => {
-  const { method } = useParams<{
-    method?: 'email'
-  }>()
-  const { top } = useSafeAreaInsets()
-  const router = useRouter()
-  const inputRef = useRef<any>(null)
-  const [inputValue, setInputValue] = useState<string>('')
-  const [loading, setLoading] = useState<boolean>(false)
-
-  const isDisabled = !inputValue.trim()
-
-  useLayoutEffect(() => {
-    const timer = setTimeout(() => {
-      inputRef.current?.focus?.()
-    }, 650)
-
-    return () => clearTimeout(timer)
-  }, [])
-
-  const handleGoBack = useEvent(() => router.back())
-
-  const handleContinue = useEvent(async () => {
-    if (!method) {
-      showError('Authentication method is not specified.')
+  const handleSignup = async () => {
+    if (!email || !password) {
+      showToast('Введіть email та пароль', { type: 'error' })
       return
     }
-
-    setLoading(true)
-
-    try {
-      router.push(
-        `/auth/login/password?method=${method}&value=${encodeURIComponent(inputValue)}`,
-      )
-    } finally {
-      setLoading(false)
+    if (password.length < 6) {
+      showToast('Пароль має бути не менше 6 символів', { type: 'error' })
+      return
     }
-  })
-
-  if (method !== 'email') {
-    return (
-      <YStack flex={1} bg="$background" pt={top} px="$4">
-        <XStack items="center" gap="$3">
-          <Pressable onPress={handleGoBack}>
-            <CaretLeftIcon size={24} />
-          </Pressable>
-        </XStack>
-        <YStack flex={1} items="center" justify="center">
-          <SizableText fontSize={16} opacity={0.6}>
-            Invalid authentication method
-          </SizableText>
-        </YStack>
-      </YStack>
-    )
+    setIsLoading(true)
+    const { error } = await signUpWithEmail(email, password)
+    setIsLoading(false)
+    if (error) {
+      showToast(error.message, { type: 'error' })
+    } else {
+      showToast('Перевірте email для підтвердження', { type: 'success' })
+      router.replace('/auth/login')
+    }
   }
 
   return (
-    <PageLayout>
-      <YStack flex={1} bg="$background" pt={top} px="$4" gap="$4">
-        <XStack items="center" gap="$3">
-          <Pressable onPress={handleGoBack}>
-            <CaretLeftIcon size={24} />
-          </Pressable>
-          <SizableText size="$6" fontWeight="bold">
-            Continue with Email
+    <YStack
+      flex={1}
+      justify="center"
+      items="center"
+      $platform-web={{ minHeight: '100vh' }}
+      bg="$background"
+    >
+      <YStack
+        gap="$4"
+        width="100%"
+        items="center"
+        bg="$background"
+        rounded="$8"
+        p={isWeb ? '$6' : '$4'}
+        maxW={isWeb ? 400 : '90%'}
+        borderWidth={isWeb ? 1 : 0}
+        borderColor="$borderColor"
+      >
+        <H2 text="center">Реєстрація в {APP_NAME}</H2>
+
+        <Input
+          placeholder="Ваше ім'я"
+          value={fullName}
+          onChangeText={setFullName}
+          width="100%"
+          size="$5"
+        />
+
+        <Input
+          placeholder="Email"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          width="100%"
+          size="$5"
+        />
+
+        <Input
+          placeholder="Пароль (мін. 6 символів)"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+          width="100%"
+          size="$5"
+        />
+
+        <Button
+          size="$5"
+          theme="dark_blue"
+          variant="floating"
+          width="100%"
+          onPress={handleSignup}
+          disabled={isLoading}
+        >
+          {isLoading ? <Spinner size="small" /> : 'Зареєструватись'}
+        </Button>
+
+        <XStack gap="$2">
+          <SizableText size="$3" color="$color10">Вже маєте акаунт?</SizableText>
+          <SizableText
+            size="$3"
+            color="$blue10"
+            cursor="pointer"
+            onPress={() => router.push('/auth/login')}
+          >
+            Увійти
           </SizableText>
         </XStack>
-
-        <SizableText size="$4" color="$color10">
-          Sign in or sign up with your email.
-        </SizableText>
-
-        <YStack gap="$4" mt="$4">
-          <Input
-            data-testid="email-input"
-            ref={inputRef}
-            placeholder="Enter email address"
-            value={inputValue}
-            onChange={(e) => setInputValue((e.target as HTMLInputElement).value)}
-            autoCapitalize="none"
-            onSubmitEditing={handleContinue}
-            type="email"
-            name="email"
-            autoComplete="email"
-            inputMode="email"
-          />
-
-          <Button
-            data-testid="next-button"
-            size="$5"
-            pressStyle={{
-              scale: 0.97,
-              opacity: 0.9,
-            }}
-            onPress={handleContinue}
-            disabled={isDisabled || loading}
-          >
-            {loading ? <Spinner size="small" /> : 'Next'}
-          </Button>
-        </YStack>
       </YStack>
-    </PageLayout>
+    </YStack>
   )
-})
+}

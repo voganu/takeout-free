@@ -1,14 +1,16 @@
-import { Tabs } from 'one'
+import { Tabs } from 'react-native-bottom-tabs'
+import { SizableText } from 'tamagui'
 
 export function TabsLayout() {
   return (
-    <Tabs
-      initialRouteName="feed"
-      screenOptions={{
-        headerShown: false,
-      }}
-    >
-      <Tabs.Screen name="feed" />
+    <Tabs>
+      <Tabs.Screen
+        name="feed"
+        options={{
+          title: 'Головна',
+          tabBarIcon: () => ({ sfSymbol: 'house' }),
+        }}
+      />
     </Tabs>
   )
 }

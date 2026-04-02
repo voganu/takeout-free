@@ -1,167 +1,81 @@
-import { Link, router } from 'one'
-import { memo, useState } from 'react'
-import { H3, Separator, Sheet, Spacer, View, XStack, YStack } from 'tamagui'
+import { router } from 'one'
+import { isWeb, XStack, SizableText, YStack } from 'tamagui'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import { useAuth } from '~/features/auth/client/authClient'
-import { useLogout } from '~/features/auth/useLogout'
-import { Logo } from '~/interface/app/Logo'
-import { Avatar } from '~/interface/avatars/Avatar'
-import { Button } from '~/interface/buttons/Button'
-import { ScrollHeader } from '~/interface/headers/ScrollHeader'
-import { DoorIcon } from '~/interface/icons/phosphor/DoorIcon'
-import { GearIcon } from '~/interface/icons/phosphor/GearIcon'
-import { ListIcon } from '~/interface/icons/phosphor/ListIcon'
-import { PageContainer } from '~/interface/layout/PageContainer'
-import { ThemeSwitch } from '~/interface/theme/ThemeSwitch'
+import { useSupabaseAuth } from '~/features/supabase/useSupabaseAuth'
+import { useSubscriptions } from '~/features/services/useSubscriptions'
 
-import { NavigationTabs } from './NavigationTabs'
+export function MainHeader() {
+  const { user, state } = useSupabaseAuth()
+  const { subscriptions } = useSubscriptions(user?.id)
+  const insets = useSafeAreaInsets()
 
-export const MainHeader = () => {
-  const { user } = useAuth()
   return (
-    <ScrollHeader>
-      <PageContainer>
-        <YStack width="100%" py="$2.5">
-          <XStack position="relative" width="100%" px="$2" items="center">
-            <XStack gap="$2" items="center">
-              <Link href="/" aria-label="Home">
-                <Logo height={20} />
-              </Link>
-            </XStack>
+    <XStack
+      bg="$background"
+      borderBottomWidth={1}
+      borderBottomColor="$borderColor"
+      px="$4"
+      pt={isWeb ? '$2' : insets.top + 4}
+      pb="$2"
+      items="center"
+      gap="$3"
+    >
+      {/* Logo */}
+      <SizableText
+        fontSize={20}
+        fontWeight="bold"
+        cursor="pointer"
+        onPress={() => router.push('/home/feed')}
+      >
+        Agent
+      </SizableText>
 
-            <Spacer flex={1} />
+      <YStack flex={1} />
 
-            <XStack
-              position="absolute"
-              inset={0}
-              pointerEvents="none"
-              items="center"
-              justify="center"
+      {/* Nav items */}
+      <XStack gap="$3" items="center">
+        {state === 'logged-in' && (
+          <>
+            <SizableText
+              size="$3"
+              cursor="pointer"
+              color="$color10"
+              hoverStyle={{ color: '$color12' }}
+              onPress={() => router.push('/home/subscriptions')}
             >
-              <View pointerEvents="auto">
-                <NavigationTabs />
-              </View>
-            </XStack>
-
-            <XStack gap="$2.5" items="center" display="none" $md={{ display: 'flex' }}>
-              {user && (
-                <Button circular cursor="pointer">
-                  <Avatar
-                    disableBorder
-                    size={28}
-                    image={user.image}
-                    name={user.name ?? 'User'}
-                  />
-                </Button>
-              )}
-
-              <ThemeSwitch />
-              <Button
-                circular
-                onPress={() => router.push('/home/settings')}
-                icon={<GearIcon size={18} />}
-                aria-label="Settings"
-              />
-            </XStack>
-
-            <MainHeaderMenu />
-          </XStack>
-        </YStack>
-      </PageContainer>
-    </ScrollHeader>
+              🔔{subscriptions.length > 0 ? ` ${subscriptions.length}` : ''}
+            </SizableText>
+            <SizableText
+              size="$3"
+              cursor="pointer"
+              color="$color10"
+              hoverStyle={{ color: '$color12' }}
+              onPress={() => router.push('/home/my-listings')}
+            >
+              📝
+            </SizableText>
+          </>
+        )}
+        <SizableText
+          size="$3"
+          cursor="pointer"
+          color="$color10"
+          hoverStyle={{ color: '$color12' }}
+          onPress={() => router.push('/home/categories')}
+        >
+          ⊞
+        </SizableText>
+        <SizableText
+          size="$3"
+          cursor="pointer"
+          color="$color10"
+          hoverStyle={{ color: '$color12' }}
+          onPress={() => state === 'logged-in' ? router.push('/home/settings') : router.push('/auth/login')}
+        >
+          {state === 'logged-in' ? '👤' : 'Увійти'}
+        </SizableText>
+      </XStack>
+    </XStack>
   )
 }
-
-export const MainHeaderMenu = memo(() => {
-  const { user } = useAuth()
-  const [open, setOpen] = useState(false)
-  const { logout } = useLogout()
-
-  const handleLogout = () => {
-    void logout()
-    setOpen(false)
-  }
-  return (
-    <>
-      <Button
-        variant="transparent"
-        circular
-        icon={<ListIcon size="$1" />}
-        aria-label="Menu"
-        onPress={() => setOpen(true)}
-        $md={{ display: 'none' }}
-      />
-      <Sheet
-        open={open}
-        onOpenChange={setOpen}
-        transition="medium"
-        modal
-        dismissOnSnapToBottom
-        snapPoints={[50]}
-      >
-        <Sheet.Overlay
-          bg="$shadow6"
-          transition="quick"
-          enterStyle={{ opacity: 0 }}
-          exitStyle={{ opacity: 0 }}
-        />
-        <Sheet.Frame bg="$color2" boxShadow="0 0 10px $shadow4">
-          <YStack flex={1} gap="$2">
-            <XStack p="$4" pb="$3" justify="space-between" items="center">
-              <XStack gap="$3" items="center">
-                <Logo height={32} />
-              </XStack>
-              <ThemeSwitch />
-            </XStack>
-
-            <Separator />
-
-            <YStack flex={1} p="$3" gap="$2">
-              <XStack
-                p="$3"
-                rounded="$4"
-                gap="$3"
-                items="center"
-                hoverStyle={{ bg: '$color3' }}
-                pressStyle={{ bg: '$color4' }}
-                cursor="pointer"
-                onPress={() => {
-                  setOpen(false)
-                  router.push('/home/settings')
-                }}
-              >
-                <GearIcon />
-                <H3 size="$3">Settings</H3>
-              </XStack>
-
-              <XStack
-                p="$3"
-                rounded="$4"
-                gap="$3"
-                items="center"
-                hoverStyle={{ bg: '$color3' }}
-                pressStyle={{ bg: '$color4' }}
-                cursor="pointer"
-                onPress={handleLogout}
-              >
-                <DoorIcon />
-                <H3 size="$3">Logout</H3>
-              </XStack>
-            </YStack>
-
-            {user && (
-              <XStack p="$4" pt="$2" gap="$3" items="center">
-                <Avatar size={40} image={user.image} name={user.name ?? 'User'} />
-                <YStack flex={1}>
-                  <H3 size="$3" fontWeight="600">
-                    {user.name || user.email}
-                  </H3>
-                </YStack>
-              </XStack>
-            )}
-          </YStack>
-        </Sheet.Frame>
-      </Sheet>
-    </>
-  )
-})

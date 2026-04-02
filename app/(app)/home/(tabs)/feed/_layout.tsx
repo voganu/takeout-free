@@ -1,5 +1,9 @@
-import { Slot } from 'one'
+import { Stack } from 'one'
 
-export function HomeLayout() {
-  return <Slot />
+export function FeedLayout() {
+  return (
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="index" />
+    </Stack>
+  )
 }

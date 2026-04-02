@@ -1,17 +1,16 @@
 import { Slot, Stack } from 'one'
+import { isWeb } from 'tamagui'
 
-export function AuthAndOnboardingLayout() {
+export function AuthLayout() {
+  if (isWeb) {
+    return <Slot />
+  }
+
   return (
-    <>
-      {process.env.VITE_PLATFORM === 'web' ? (
-        <Slot />
-      ) : (
-        <Stack screenOptions={{ headerShown: false }} initialRouteName="login">
-          <Stack.Screen name="login" />
-          <Stack.Screen name="login/password" />
-          <Stack.Screen name="signup/[method]" />
-        </Stack>
-      )}
-    </>
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="login" />
+      <Stack.Screen name="signup/[method]" />
+      <Stack.Screen name="callback" />
+    </Stack>
   )
 }
