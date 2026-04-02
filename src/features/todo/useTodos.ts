@@ -1,8 +1,8 @@
-import { useMemo } from 'react'
+'use no memo'
+import { useEffect, useMemo, useState } from 'react'
 
-import { todosByUserId } from '~/data/queries/todo'
-import { useAuth } from '~/features/auth/client/authClient'
-import { useQuery, zero } from '~/zero/client'
+import { supabase } from '~/features/supabase/client'
+import { useSupabaseAuth } from '~/features/supabase/useSupabaseAuth'
 
 export interface Todo {
   id: string
@@ -13,23 +13,32 @@ export interface Todo {
 }
 
 export function useTodos() {
-  const auth = useAuth()
-  const userId = auth?.user?.id
+  const { user } = useSupabaseAuth()
+  const userId = user?.id
 
-  const [todos, { type }] = useQuery(
-    todosByUserId,
-    { userId: userId || '' },
-    { enabled: Boolean(userId) },
-  )
+  const [todos, setTodos] = useState<Todo[]>([])
+  const [isLoading, setIsLoading] = useState(true)
 
-  const isLoading = type === 'unknown'
+  useEffect(() => {
+    if (!userId) {
+      setIsLoading(false)
+      return
+    }
 
-  const sortedTodos = useMemo(() => {
-    if (!todos) return []
-    return [...todos] as Todo[]
-  }, [todos])
+    supabase
+      .from('todo')
+      .select('*')
+      .eq('userId', userId)
+      .order('createdAt', { ascending: false })
+      .then(({ data }) => {
+        setIsLoading(false)
+        setTodos((data as Todo[]) || [])
+      })
+  }, [userId])
 
-  const addTodo = (text: string) => {
+  const sortedTodos = useMemo(() => todos, [todos])
+
+  const addTodo = async (text: string) => {
     if (!userId) return
 
     const newTodo: Todo = {
@@ -40,15 +49,18 @@ export function useTodos() {
       createdAt: Date.now(),
     }
 
-    zero.mutate.todo.insert(newTodo)
+    const { data } = await supabase.from('todo').insert(newTodo).select().single()
+    if (data) setTodos((prev) => [data as Todo, ...prev])
   }
 
-  const toggleTodo = (todoId: string, completed: boolean) => {
-    zero.mutate.todo.update({ id: todoId, completed })
+  const toggleTodo = async (todoId: string, completed: boolean) => {
+    await supabase.from('todo').update({ completed }).eq('id', todoId)
+    setTodos((prev) => prev.map((t) => (t.id === todoId ? { ...t, completed } : t)))
   }
 
-  const deleteTodo = (todoId: string) => {
-    zero.mutate.todo.delete({ id: todoId })
+  const deleteTodo = async (todoId: string) => {
+    await supabase.from('todo').delete().eq('id', todoId)
+    setTodos((prev) => prev.filter((t) => t.id !== todoId))
   }
 
   return {
