@@ -1,5 +1,5 @@
 // Brand
-export const APP_NAME = 'Takeout'
+export const APP_NAME = 'Agent'
 export const APP_NAME_LOWERCASE = 'takeout'
 
 // Domain
