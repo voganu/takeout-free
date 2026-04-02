@@ -21,3 +21,13 @@ INSERT INTO categories (id, name, slug, description, icon, type) VALUES
   ('22222222-2222-2222-2222-222222222207', 'Юридичні послуги', 'legal-offer', 'Консультації, документи, суди', '⚖️', 'offer'),
   ('22222222-2222-2222-2222-222222222208', 'Прибирання', 'cleaning-offer', 'Прибирання квартир та офісів', '🧹', 'offer')
 ON CONFLICT DO NOTHING;
+
+-- NOTE: Demo service_requests and service_offers require real auth.users entries.
+-- To populate demo data, first create users via Supabase Dashboard > Authentication > Users,
+-- then run INSERT statements like:
+--
+-- INSERT INTO service_requests (user_id, title, description, category_id, location, status, budget) VALUES
+--   ('<user-id>', 'Потрібен веб-розробник', 'Опис запиту...', '11111111-1111-1111-1111-111111111101', 'Київ', 'active', '50000 грн');
+--
+-- INSERT INTO service_offers (user_id, title, description, category_id, location, status, price) VALUES
+--   ('<user-id>', 'Розробка сайтів на React', 'Опис пропозиції...', '22222222-2222-2222-2222-222222222201', 'Київ', 'active', 'від 20000 грн');

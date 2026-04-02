@@ -1,6 +1,6 @@
 import { router } from 'one'
 import { memo, useState } from 'react'
-import { isWeb, ScrollView, SizableText, Spinner, XStack, YStack, Input as TamaguiInput } from 'tamagui'
+import { isWeb, ScrollView, SizableText, Spinner, XStack, YStack } from 'tamagui'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { useSupabaseAuth } from '~/features/supabase/useSupabaseAuth'
@@ -8,6 +8,7 @@ import { useCategories } from '~/features/services/useCategories'
 import { useSubscriptions } from '~/features/services/useSubscriptions'
 import { useCategorize } from '~/features/services/useCategorize'
 import { Button } from '~/interface/buttons/Button'
+import { Input } from '~/interface/forms/Input'
 import { showToast } from '~/interface/toast/helpers'
 
 export const HomePage = memo(() => {
@@ -81,7 +82,7 @@ export const HomePage = memo(() => {
             focusStyle={{ borderColor: '$blue10' }}
           >
             <SizableText size="$5">🔍</SizableText>
-            <TamaguiInput
+            <Input
               flex={1}
               placeholder="Напишіть ваш запит або пропозицію..."
               value={searchText}

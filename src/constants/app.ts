@@ -1,6 +1,6 @@
 // Brand
 export const APP_NAME = 'Agent'
-export const APP_NAME_LOWERCASE = 'takeout'
+export const APP_NAME_LOWERCASE = APP_NAME.toLowerCase()
 
 // Domain
 export const DOMAIN = 'takeout.tamagui.dev'
